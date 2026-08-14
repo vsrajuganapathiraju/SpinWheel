@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teams Spin Wheel Application</title>
+    <title>Teams Fortune Wheel Application</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=ADLaM+Display&display=swap" rel="stylesheet">
@@ -35,12 +35,20 @@
             width: 450px;
             height: 450px;
         }
+        .confetti-overlay {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            background: transparent;
+        }
         canvas {
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-            transition: transform 4s cubic-bezier(0.1, 0.8, 0.1, 1);
+            transition: transform 4.5s cubic-bezier(0.1, 0.8, 0.1, 1);
         }
         .winner-box {
             position: absolute;
@@ -201,6 +209,8 @@
     </style>
 </head>
 <body>
+    <canvas id="confettiCanvas" class="confetti-overlay"></canvas>
+    <audio id="drumRollAudio" src="lazychillzone-drum-roll-2-228358.mp3" preload="auto"></audio>
 
     <!-- Wheel Area Space (Left Side) -->
     <div class="wheel-container">
@@ -236,6 +246,7 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
     <script>
         const baselineMasterList = [
             "Aidan Whitehouse", "Alex Angas", "Andy Vu", "Anthony Grant", "Bao Doan",
@@ -267,6 +278,9 @@
         const newNameInput = document.getElementById('newNameInput');
         const sidebarEl = document.querySelector('.sidebar');
         const toggleMembersBtn = document.getElementById('toggleMembersBtn');
+        const confettiCanvasEl = document.getElementById('confettiCanvas');
+        const wheelWrapperEl = document.querySelector('.wheel-wrapper');
+        const drumRollAudio = document.getElementById('drumRollAudio');
 
         const defaultPickedNames = [
             'Fredrik Lindvall',
@@ -277,6 +291,63 @@
         let currentRotation = 0;
         let isSpinning = false;
         const colors = ['#f43f5e', '#3b82f6', '#10b981', '#eab308', '#8b5cf6', '#ec4899', '#f97316', '#14b8a6'];
+        const confettiInstance = (typeof confetti === 'function' && confettiCanvasEl)
+            ? confetti.create(confettiCanvasEl, { resize: true, useWorker: true })
+            : null;
+
+        function stopAllAudio() {
+            document.querySelectorAll('audio').forEach((audioEl) => {
+                audioEl.pause();
+                audioEl.currentTime = 0;
+            });
+        }
+
+        function startDrumRoll() {
+            if (!drumRollAudio) return;
+            stopAllAudio();
+            drumRollAudio.loop = false;
+            drumRollAudio.currentTime = 0;
+            const playPromise = drumRollAudio.play();
+            if (playPromise && typeof playPromise.catch === 'function') {
+                playPromise.catch(() => {});
+            }
+        }
+
+        function stopDrumRoll() {
+            if (!drumRollAudio) return;
+            drumRollAudio.pause();
+            drumRollAudio.currentTime = 0;
+        }
+
+        function popConfetti() {
+            if (!confettiInstance) return;
+
+            const durationMs = 2800;
+            const animationEnd = Date.now() + durationMs;
+
+            const wheelRect = wheelWrapperEl.getBoundingClientRect();
+            const centerOrigin = {
+                x: (wheelRect.left + (wheelRect.width / 2)) / window.innerWidth,
+                y: (wheelRect.top + (wheelRect.height / 2)) / window.innerHeight
+            };
+
+            (function frame() {
+                const timeLeft = animationEnd - Date.now();
+                if (timeLeft <= 0) return;
+
+                const particleCount = Math.max(8, Math.floor(26 * (timeLeft / durationMs)));
+                confettiInstance({
+                    particleCount,
+                    startVelocity: 40,
+                    spread: 75,
+                    ticks: 140,
+                    scalar: 1.1,
+                    origin: centerOrigin
+                });
+
+                requestAnimationFrame(frame);
+            })();
+        }
 
         function sanitizeName(value) {
             return String(value || '').trim();
@@ -518,6 +589,7 @@
         function spinTheWheel() {
             if (isSpinning || notPicked.length === 0) return;
 
+            startDrumRoll();
             isSpinning = true;
             spinBtn.disabled = true;
             winnerBox.textContent = 'SPINNING...';
@@ -526,10 +598,15 @@
             const arc = 360 / notPicked.length;
             const targetAngle = (winnerIndex * arc) + (arc / 2);
             const pointerAngle = 270;
-            const extraSpins = 6 * 360;
-            const rotateTo = extraSpins + (pointerAngle - targetAngle);
-            currentRotation += rotateTo;
+            const extraSpins = 8 * 360;
+            const revealDelayMs = 4500;
+            const slowDownMs = 2300;
+            const settleAngle = Math.max(140, Math.min(260, arc * 6));
 
+            const fastPhaseRotate = extraSpins + (pointerAngle - targetAngle) - settleAngle;
+            currentRotation += fastPhaseRotate;
+
+            canvas.style.transition = `transform ${revealDelayMs / 1000}s linear`;
             canvas.style.transform = `rotate(${currentRotation}deg)`;
 
             window.setTimeout(() => {
@@ -540,14 +617,25 @@
                 saveState();
                 renderList();
                 winnerBox.textContent = winner || 'No winner';
-                isSpinning = false;
-                spinBtn.disabled = notPicked.length === 0;
-            }, 4000);
+                popConfetti();
+
+                // Continue rotation briefly and ease out after reveal.
+                canvas.style.transition = `transform ${slowDownMs / 1000}s cubic-bezier(0.06, 0.92, 0.2, 1)`;
+                currentRotation += settleAngle;
+                canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+                window.setTimeout(() => {
+                    isSpinning = false;
+                    spinBtn.disabled = notPicked.length === 0;
+                }, slowDownMs);
+            }, revealDelayMs);
         }
 
         function resetTheWheel() {
+            stopDrumRoll();
             isSpinning = false;
             currentRotation = 0;
+            canvas.style.transition = 'none';
             canvas.style.transform = 'rotate(0deg)';
             winnerBox.textContent = 'READY TO SPIN!';
             spinBtn.disabled = notPicked.length === 0;
