@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teams Fortune Wheel Application</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=ADLaM+Display&display=swap" rel="stylesheet">
+    
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'ADLaM Display', system-ui, sans-serif;
+            background-color: #f3f4f6;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        body.members-hidden .sidebar { display: none; }
+        body.members-hidden .wheel-container { flex: 1; }
+        /* Left Section: Wheel Canvas Layout Workspace */
+        .wheel-container {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            position: relative;
+            padding: 20px;
+        }
+        .wheel-wrapper {
+            position: relative;
+            width: 450px;
+            height: 450px;
+        }
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            transition: transform 4s cubic-bezier(0.1, 0.8, 0.1, 1);
+        }
+        .winner-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 15;
+            background: #1e293b;
+            color: #ffffff;
+            font-size: 24px;
+            padding: 12px 24px;
+            border-radius: 12px;
+            min-width: 260px;
+            max-width: 85%;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            border: 3px solid #3b82f6;
+            pointer-events: none;
+        }
+        .btn-group {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+        }
+        button {
+            font-family: 'ADLaM Display', sans-serif;
+            font-size: 18px;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .spin-btn { background-color: #2563eb; color: white; }
+        .spin-btn:hover { background-color: #1d4ed8; }
+        .reset-btn { background-color: #64748b; color: white; }
+        .reset-btn:hover { background-color: #475569; }
+        .toggle-btn { background-color: #0f766e; color: white; margin-top: 12px; }
+        .toggle-btn:hover { background-color: #115e59; }
+        button:disabled { background-color: #cbd5e1; cursor: not-allowed; transform: none; }
+
+        /* Right Section: Interactive Sidebar Database */
+        .sidebar {
+            flex: 0.8;
+            background: #1e293b;
+            color: white;
+            display: flex;
+            border-left: 4px solid #3b82f6;
+        }
+        .column {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #334155;
+        }
+        .column:last-child { border-right: none; }
+        h2 { font-size: 20px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #3b82f6; color: #93c5fd; text-align: center; }
+        .count-subtext {
+            margin-top: -6px;
+            margin-bottom: 10px;
+            text-align: center;
+            font-family: sans-serif;
+            font-size: 12px;
+            color: #94a3b8;
+        }
+        
+        /* Inline Addition Input Form Controls */
+        .add-name-form {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .add-input {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #475569;
+            background: #0f172a;
+            color: white;
+            font-family: sans-serif;
+            font-size: 14px;
+        }
+        .add-btn {
+            background: #10b981;
+            color: white;
+            padding: 6px 14px;
+            font-size: 15px;
+            border-radius: 6px;
+            box-shadow: none;
+        }
+        .add-btn:hover { background: #059669; }
+
+        .list-container {
+            flex: 1;
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 12px;
+            overflow-y: auto;
+        }
+        
+        /* Interactive Row Items styling rules */
+        .name-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 10px;
+            margin-bottom: 8px;
+            background: #1e293b;
+            border-radius: 6px;
+            font-size: 15px;
+            border-left: 4px solid #60a5fa;
+        }
+        .editable-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: white;
+            font-family: sans-serif;
+            font-size: 15px;
+            padding: 2px 4px;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+        .editable-input:focus {
+            background: #334155;
+            outline: 1px solid #60a5fa;
+        }
+        
+        .picked-column .name-item { border-left-color: #f87171; background: #1e293b; }
+        .picked-name-text {
+            font-family: sans-serif;
+            color: #94a3b8;
+            text-decoration: line-through;
+            padding: 2px 4px;
+        }
+
+        /* Delete / Action Button Styles */
+        .action-del-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 24px;
+            height: 24px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+            box-shadow: none;
+            padding: 0;
+        }
+        .action-del-btn:hover { background: #dc2626; }
+    </style>
+</head>
+<body class="members-hidden">
+
+    <!-- Wheel Area Space (Left Side) -->
+    <div class="wheel-container">
+        <div class="wheel-wrapper">
+            <canvas id="wheelCanvas" width="500" height="500"></canvas>
+            <div class="winner-box" id="winnerBox">READY TO SPIN!</div>
+        </div>
+        <div class="btn-group">
+            <button class="spin-btn" id="spinBtn" onclick="spinTheWheel()">SPIN WHEEL</button>
+        </div>
+        <button class="toggle-btn" id="toggleMembersBtn" onclick="toggleMembersData()">Show Members Data</button>
+    </div>
+
+    <!-- Active Management Columns (Right Side) -->
+    <div class="sidebar">
+        <!-- Not Picked Roster Module -->
+        <div class="column">
+            <h2>NOT PICKED YET</h2>
+            <div class="count-subtext" id="notPickedCount">Total members - 0</div>
+            <div class="add-name-form">
+                <input type="text" id="newNameInput" class="add-input" placeholder="Type a new name..." onkeydown="if(event.key === 'Enter') addNewName()">
+                <button class="add-btn" onclick="addNewName()">+</button>
+            </div>
+            <div class="list-container" id="notPickedList"></div>
+        </div>
+        
+        <!-- Archive Selected Module -->
+        <div class="column picked-column">
+            <h2>ALREADY PICKED</h2>
+            <div class="count-subtext" id="pickedCount">Total members - 0</div>
+            <div style="height: 38px; visibility: hidden;">Spacer</div>
+            <div class="list-container" id="pickedList"></div>
+        </div>
+    </div>
+
+    <script>
+        const baselineMasterList = [
+            "Aidan Whitehouse", "Alex Angas", "Andy Vu", "Anthony Grant", "Bao Doan",
+            "Ben Shapiro", "Chloe Bolton", "Craig Strage", "Cuneyt Uysal", "David Wolf", "Ethan Shapiro",
+            "Fredrik Lindvall", "Hannah Hall-Brown", "Hiep Le", "Jair Carvalho", "James Barrow",
+            "Jeremy Hahn", "Jill Roberson", "Joel Morland", "Johanes Iskandar", "Kamil Cyganiak",
+            "Khuram Shahzad", "Kingsley Hibbert", "Leo Dang", "Leonardo Conde", "Lynsey Jackson",
+            "Matt Dane", "Matthew Watson", "Mehedi Hasan", "Mitchell Watkins", "Nige McHugh",
+            "Owen Brandt", "Patrick Hatton", "Piers Matthews", "Raju Ganapathiraju", "Sebastian Delgado",
+            "Tania Hatchman", "Tristan Le", "Truong Bui", "Tuan Le", "Viet Anh Nguyen"
+        ];
+
+        const STORAGE_KEYS = {
+            notPicked: 'wheel_notPicked',
+            picked: 'wheel_picked'
+        };
+
+        let notPicked = [];
+        let picked = [];
+
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const spinBtn = document.getElementById('spinBtn');
+        const winnerBox = document.getElementById('winnerBox');
+        const notPickedListEl = document.getElementById('notPickedList');
+        const pickedListEl = document.getElementById('pickedList');
+        const notPickedCountEl = document.getElementById('notPickedCount');
+        const pickedCountEl = document.getElementById('pickedCount');
+        const newNameInput = document.getElementById('newNameInput');
+        const sidebarEl = document.querySelector('.sidebar');
+        const toggleMembersBtn = document.getElementById('toggleMembersBtn');
+
+        const defaultPickedNames = [
+            'Fredrik Lindvall',
+            'Raju Ganapathiraju'
+        ];
+        const expectedInitialMemberCount = 41;
+
+        let currentRotation = 0;
+        let isSpinning = false;
+        const colors = ['#f43f5e', '#3b82f6', '#10b981', '#eab308', '#8b5cf6', '#ec4899', '#f97316', '#14b8a6'];
+
+        function sanitizeName(value) {
+            return String(value || '').trim();
+        }
+
+        function uniqueNames(names) {
+            const seen = new Set();
+            return names.filter((name) => {
+                const normalized = sanitizeName(name);
+                if (!normalized || seen.has(normalized.toLowerCase())) {
+                    return false;
+                }
+                seen.add(normalized.toLowerCase());
+                return true;
+            }).map((n) => sanitizeName(n));
+        }
+
+        function sortNames(names) {
+            return [...names].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+        }
+
+        function safeReadArray(key) {
+            try {
+                const raw = localStorage.getItem(key);
+                if (!raw) return null;
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : null;
+            } catch {
+                return null;
+            }
+        }
+
+        function loadState() {
+            const storedNotPicked = safeReadArray(STORAGE_KEYS.notPicked);
+            const storedPicked = safeReadArray(STORAGE_KEYS.picked);
+
+            const canonicalBase = sortNames(uniqueNames(baselineMasterList));
+            const existingCombined = uniqueNames([...(storedNotPicked || []), ...(storedPicked || [])]);
+            const canonicalSet = new Set(canonicalBase.map((n) => n.toLowerCase()));
+            const legacyExtraMembers = existingCombined.filter((n) => !canonicalSet.has(n.toLowerCase()));
+            const base = sortNames(uniqueNames([...canonicalBase, ...legacyExtraMembers]));
+
+            if (canonicalBase.length !== expectedInitialMemberCount) {
+                console.warn(`Baseline roster has ${canonicalBase.length} members; expected ${expectedInitialMemberCount}.`);
+            }
+
+            const mergedNotPicked = uniqueNames(storedNotPicked || base);
+            const mergedPicked = uniqueNames(storedPicked || []);
+
+            // Keep lists mutually exclusive and self-heal corrupted state.
+            const pickedSet = new Set(mergedPicked.map((n) => n.toLowerCase()));
+            notPicked = mergedNotPicked.filter((n) => !pickedSet.has(n.toLowerCase()));
+            picked = mergedPicked.filter((n) => !notPicked.some((x) => x.toLowerCase() === n.toLowerCase()));
+
+            // Ensure specific members are always pre-seeded in the picked column.
+            const forcedPickedSet = new Set(defaultPickedNames.map((n) => n.toLowerCase()));
+            notPicked = notPicked.filter((n) => !forcedPickedSet.has(n.toLowerCase()));
+            defaultPickedNames.forEach((name) => {
+                if (!picked.some((n) => n.toLowerCase() === name.toLowerCase())) {
+                    picked.unshift(name);
+                }
+            });
+            picked = uniqueNames(picked);
+
+            // Restore any baseline members accidentally removed from both lists.
+            const combinedSet = new Set([...notPicked, ...picked].map((n) => n.toLowerCase()));
+            base.forEach((name) => {
+                if (!combinedSet.has(name.toLowerCase())) {
+                    notPicked.push(name);
+                }
+            });
+            notPicked = sortNames(uniqueNames(notPicked));
+
+            if (!notPicked.length && !picked.length) {
+                notPicked = sortNames([...base]);
+            }
+        }
+
+        function saveState() {
+            notPicked = sortNames(uniqueNames(notPicked));
+            picked = uniqueNames(picked);
+            localStorage.setItem(STORAGE_KEYS.notPicked, JSON.stringify(notPicked));
+            localStorage.setItem(STORAGE_KEYS.picked, JSON.stringify(picked));
+        }
+
+        function drawWheel() {
+            const size = canvas.width;
+            const radius = size / 2;
+
+            ctx.clearRect(0, 0, size, size);
+
+            if (!notPicked.length) {
+                ctx.beginPath();
+                ctx.arc(radius, radius, radius - 2, 0, Math.PI * 2);
+                ctx.fillStyle = '#334155';
+                ctx.fill();
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 28px ADLaM Display, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('No names left', radius, radius + 10);
+                return;
+            }
+
+            const arc = (Math.PI * 2) / notPicked.length;
+
+            notPicked.forEach((name, index) => {
+                const startAngle = index * arc;
+                const endAngle = startAngle + arc;
+
+                ctx.beginPath();
+                ctx.moveTo(radius, radius);
+                ctx.arc(radius, radius, radius - 2, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[index % colors.length];
+                ctx.fill();
+
+                ctx.save();
+                ctx.translate(radius, radius);
+                ctx.rotate(startAngle + arc / 2);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = '14px sans-serif';
+                const label = name.length > 18 ? `${name.slice(0, 18)}...` : name;
+                ctx.fillText(label, radius - 18, 5);
+                ctx.restore();
+            });
+        }
+
+        function renderList() {
+            notPicked = sortNames(uniqueNames(notPicked));
+            notPickedListEl.innerHTML = '';
+            pickedListEl.innerHTML = '';
+            notPickedCountEl.textContent = `Total members - ${notPicked.length}`;
+            pickedCountEl.textContent = `Total members - ${picked.length}`;
+
+            notPicked.forEach((name, index) => {
+                const row = document.createElement('div');
+                row.className = 'name-item';
+
+                const input = document.createElement('input');
+                input.className = 'editable-input';
+                input.value = name;
+                input.addEventListener('change', () => renameNotPicked(index, input.value));
+                input.addEventListener('blur', () => renameNotPicked(index, input.value));
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'action-del-btn';
+                delBtn.type = 'button';
+                delBtn.textContent = 'x';
+                delBtn.title = 'Delete name';
+                delBtn.addEventListener('click', () => deleteNotPicked(index));
+
+                row.append(input, delBtn);
+                notPickedListEl.appendChild(row);
+            });
+
+            picked.forEach((name, index) => {
+                const row = document.createElement('div');
+                row.className = 'name-item';
+
+                const label = document.createElement('span');
+                label.className = 'picked-name-text';
+                label.textContent = name;
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'action-del-btn';
+                delBtn.type = 'button';
+                delBtn.textContent = 'x';
+                delBtn.title = 'Delete name';
+                delBtn.addEventListener('click', () => deletePicked(index));
+
+                row.append(label, delBtn);
+                pickedListEl.appendChild(row);
+            });
+
+            drawWheel();
+            spinBtn.disabled = isSpinning || notPicked.length === 0;
+        }
+
+        function addNewName() {
+            const name = sanitizeName(newNameInput.value);
+            if (!name) return;
+
+            const exists = [...notPicked, ...picked].some((n) => n.toLowerCase() === name.toLowerCase());
+            if (exists) {
+                winnerBox.textContent = 'Name already exists';
+                newNameInput.select();
+                return;
+            }
+
+            notPicked.push(name);
+            newNameInput.value = '';
+            saveState();
+            renderList();
+            winnerBox.textContent = `${name} added`;
+        }
+
+        function renameNotPicked(index, proposedName) {
+            const next = sanitizeName(proposedName);
+            if (!next) {
+                renderList();
+                return;
+            }
+
+            const current = notPicked[index];
+            const duplicate = [...notPicked, ...picked].some((name, i) => {
+                if (name === current && i === index) return false;
+                return name.toLowerCase() === next.toLowerCase();
+            });
+
+            if (duplicate) {
+                winnerBox.textContent = 'Duplicate name not allowed';
+                renderList();
+                return;
+            }
+
+            notPicked[index] = next;
+            saveState();
+            renderList();
+        }
+
+        function deleteNotPicked(index) {
+            const [removed] = notPicked.splice(index, 1);
+            saveState();
+            renderList();
+            winnerBox.textContent = removed ? `${removed} removed` : winnerBox.textContent;
+        }
+
+        function deletePicked(index) {
+            const [removed] = picked.splice(index, 1);
+            if (removed && !notPicked.some((name) => name.toLowerCase() === removed.toLowerCase())) {
+                notPicked.unshift(removed);
+            }
+            saveState();
+            renderList();
+            winnerBox.textContent = removed ? 'READY TO SPIN!' : winnerBox.textContent;
+        }
+
+        function spinTheWheel() {
+            if (isSpinning || notPicked.length === 0) return;
+
+            isSpinning = true;
+            spinBtn.disabled = true;
+            winnerBox.textContent = 'SPINNING...';
+
+            const winnerIndex = Math.floor(Math.random() * notPicked.length);
+            const arc = 360 / notPicked.length;
+            const targetAngle = (winnerIndex * arc) + (arc / 2);
+            const pointerAngle = 270;
+            const extraSpins = 6 * 360;
+            const rotateTo = extraSpins + (pointerAngle - targetAngle);
+            currentRotation += rotateTo;
+
+            canvas.style.transform = `rotate(${currentRotation}deg)`;
+
+            window.setTimeout(() => {
+                const winner = notPicked[winnerIndex];
+                notPicked.splice(winnerIndex, 1);
+                picked.unshift(winner);
+
+                saveState();
+                renderList();
+                winnerBox.textContent = winner || 'No winner';
+                isSpinning = false;
+                spinBtn.disabled = notPicked.length === 0;
+            }, 4000);
+        }
+
+        function resetTheWheel() {
+            isSpinning = false;
+            currentRotation = 0;
+            canvas.style.transform = 'rotate(0deg)';
+            winnerBox.textContent = 'READY TO SPIN!';
+            spinBtn.disabled = notPicked.length === 0;
+        }
+
+        function toggleMembersData() {
+            const hidden = document.body.classList.toggle('members-hidden');
+            toggleMembersBtn.textContent = hidden ? 'Show Members Data' : 'Hide Members Data';
+            sidebarEl.setAttribute('aria-hidden', String(hidden));
+        }
+
+        loadState();
+        saveState();
+        renderList();
+
+        // Expose functions for inline button handlers.
+        window.spinTheWheel = spinTheWheel;
+        window.resetTheWheel = resetTheWheel;
+        window.addNewName = addNewName;
+        window.toggleMembersData = toggleMembersData;
+    </script>
+</body>
+</html>
