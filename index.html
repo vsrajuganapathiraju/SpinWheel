@@ -284,7 +284,9 @@
 
         const defaultPickedNames = [
             'Fredrik Lindvall',
-            'Raju Ganapathiraju'
+            'Raju Ganapathiraju',
+            'Piers Matthews',
+            'Leo Dang'
         ];
         const expectedInitialMemberCount = 41;
 
@@ -504,7 +506,7 @@
                 notPickedListEl.appendChild(row);
             });
 
-            picked.forEach((name, index) => {
+            picked.forEach((name) => {
                 const row = document.createElement('div');
                 row.className = 'name-item';
 
@@ -512,14 +514,7 @@
                 label.className = 'picked-name-text';
                 label.textContent = name;
 
-                const delBtn = document.createElement('button');
-                delBtn.className = 'action-del-btn';
-                delBtn.type = 'button';
-                delBtn.textContent = 'x';
-                delBtn.title = 'Delete name';
-                delBtn.addEventListener('click', () => deletePicked(index));
-
-                row.append(label, delBtn);
+                row.append(label);
                 pickedListEl.appendChild(row);
             });
 
@@ -574,16 +569,6 @@
             saveState();
             renderList();
             winnerBox.textContent = removed ? `${removed} removed` : winnerBox.textContent;
-        }
-
-        function deletePicked(index) {
-            const [removed] = picked.splice(index, 1);
-            if (removed && !notPicked.some((name) => name.toLowerCase() === removed.toLowerCase())) {
-                notPicked.unshift(removed);
-            }
-            saveState();
-            renderList();
-            winnerBox.textContent = removed ? 'READY TO SPIN!' : winnerBox.textContent;
         }
 
         function spinTheWheel() {
